@@ -1,0 +1,3 @@
+provider_id,food_type,meal_type,quantity_kg,listed_at,expires_at,city,notes
+1,Rice and dal,lunch,15,2025-08-19,2025-08-20,Mumbai,Freshly cooked surplus
+2,Bread loaf,snacks,8,2025-08-19,2025-08-21,Pune,Packaged today

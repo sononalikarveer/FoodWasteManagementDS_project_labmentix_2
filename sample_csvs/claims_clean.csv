@@ -1,0 +1,3 @@
+listing_id,receiver_id,status,claimed_at,fulfilled_at,notes
+1,1,approved,2025-08-19,,NGO will pick up by 6pm
+2,2,pending,2025-08-19,,Pending confirmation
