@@ -39,8 +39,6 @@ def main():
         col3.metric("Food Listings", total_food)
         col4.metric("Claims", total_claims)
     
-    
-    
     # ---------------- Providers ----------------
     elif choice == "Providers":
         st.header("🏢 Providers")
@@ -69,139 +67,347 @@ def main():
     elif choice == "SQL Insights":
         st.header("📈 SQL Insights & Analysis")
 
-        # 1. Providers and Receivers per City
-        st.subheader("1️⃣ Providers & Receivers per City")
-        df = get_df("""
-            SELECT City, 
-                   (SELECT COUNT(*) FROM providers p WHERE p.City = c.City) AS Providers,
-                   (SELECT COUNT(*) FROM receivers r WHERE r.City = c.City) AS Receivers
-            FROM (SELECT City FROM providers UNION SELECT City FROM receivers) c
-        """)
-        st.dataframe(df)
+        insights = {
+            "1️⃣ Providers & Receivers per City": """
+                SELECT City,
+                    (SELECT COUNT(*) FROM providers p WHERE p.City = c.City) AS Providers,
+                    (SELECT COUNT(*) FROM receivers r WHERE r.City = c.City) AS Receivers
+                FROM (SELECT City FROM providers UNION SELECT City FROM receivers) c
+            """,
+            "2️⃣ Provider Type contributing most food": """
+                SELECT Provider_Type, COUNT(*) as Total_Listings
+                FROM food_listings
+                GROUP BY Provider_Type
+                ORDER BY Total_Listings DESC
+            """,
+            "3️⃣ Provider Contact Info by City": None,
+            "4️⃣ Top Receivers by Claims": """
+                SELECT r.Name, COUNT(c.Claim_ID) as Total_Claims
+                FROM receivers r
+                JOIN claims c ON r.Receiver_ID = c.Receiver_ID
+                GROUP BY r.Name
+                ORDER BY Total_Claims DESC
+            """,
+            "5️⃣ Total Food Quantity Available": """
+                SELECT SUM(Quantity) as Total_Quantity FROM food_listings
+            """,
+            "6️⃣ City with Most Food Listings": """
+                SELECT Location, COUNT(*) as Listings
+                FROM food_listings
+                GROUP BY Location
+                ORDER BY Listings DESC
+            """,
+            "7️⃣ Most Common Food Types": """
+                SELECT Food_Type, COUNT(*) as Count
+                FROM food_listings
+                GROUP BY Food_Type
+                ORDER BY Count DESC
+            """,
+            "8️⃣ Claims per Food Item": """
+                SELECT f.Food_Name, COUNT(c.Claim_ID) as Claims
+                FROM food_listings f
+                LEFT JOIN claims c ON f.Food_ID = c.Food_ID
+                GROUP BY f.Food_Name
+                ORDER BY Claims DESC
+            """,
+            "9️⃣ Provider with Most Successful Claims": """
+                SELECT p.Name, COUNT(c.Claim_ID) as Successful_Claims
+                FROM providers p
+                JOIN food_listings f ON p.Provider_ID = f.Provider_ID
+                JOIN claims c ON f.Food_ID = c.Food_ID
+                WHERE c.Status = 'Completed'
+                GROUP BY p.Name
+                ORDER BY Successful_Claims DESC
+            """,
+            "🔟 Claim Status Distribution": """
+                SELECT Status, COUNT(*) as Count
+                FROM claims
+                GROUP BY Status
+            """,
+            "1️⃣1️⃣ Average Quantity Claimed per Receiver": """
+                SELECT r.Name, AVG(f.Quantity) as Avg_Claimed
+                FROM receivers r
+                JOIN claims c ON r.Receiver_ID = c.Receiver_ID
+                JOIN food_listings f ON c.Food_ID = f.Food_ID
+                GROUP BY r.Name
+            """,
+            "1️⃣2️⃣ Most Claimed Meal Type": """
+                SELECT f.Meal_Type, COUNT(c.Claim_ID) as Claims
+                FROM food_listings f
+                JOIN claims c ON f.Food_ID = c.Food_ID
+                GROUP BY f.Meal_Type
+                ORDER BY Claims DESC
+            """,
+            "1️⃣3️⃣ Total Quantity Donated per Provider": """
+                SELECT p.Name, SUM(f.Quantity) as Total_Quantity
+                FROM providers p
+                JOIN food_listings f ON p.Provider_ID = f.Provider_ID
+                GROUP BY p.Name
+                ORDER BY Total_Quantity DESC
+            """
+        }
 
-        # 2. Provider Type contributing most food
-        st.subheader("2️⃣ Provider Type contributing most food")
-        df = get_df("""
-            SELECT Provider_Type, COUNT(*) as Total_Listings
-            FROM food_listings
-            GROUP BY Provider_Type
-            ORDER BY Total_Listings DESC
-        """)
-        st.bar_chart(df.set_index("Provider_Type"))
+        selected_insight = st.selectbox("Select SQL Insight", list(insights.keys()))
 
-        # 3. Contact info of providers in specific city
-        st.subheader("3️⃣ Provider Contact Info by City")
-        city = st.selectbox("Select City", get_df("SELECT DISTINCT City FROM providers")["City"].tolist())
-        df = get_df("SELECT Name, Contact FROM providers WHERE City = ?", (city,))
-        st.dataframe(df)
+        if selected_insight == "3️⃣ Provider Contact Info by City":
+            city = st.selectbox("Select City", get_df("SELECT DISTINCT City FROM providers")["City"].tolist())
+            df = get_df("SELECT Name, Contact FROM providers WHERE City = ?", (city,))
+            st.dataframe(df)
+        else:
+            query = insights[selected_insight]
+            df = get_df(query)
+            st.dataframe(df)
 
-        # 4. Receivers with most claims
-        st.subheader("4️⃣ Top Receivers by Claims")
-        df = get_df("""
-            SELECT r.Name, COUNT(c.Claim_ID) as Total_Claims
-            FROM receivers r
-            JOIN claims c ON r.Receiver_ID = c.Receiver_ID
-            GROUP BY r.Name
-            ORDER BY Total_Claims DESC
-        """)
-        st.bar_chart(df.set_index("Name"))
-
-        # 5. Total quantity of food
-        st.subheader("5️⃣ Total Food Quantity Available")
-        df = get_df("SELECT SUM(Quantity) as Total_Quantity FROM food_listings")
-        st.metric("Total Quantity Available", df["Total_Quantity"].iloc[0])
-
-        # 6. City with most food listings
-        st.subheader("6️⃣ City with Most Food Listings")
-        df = get_df("""
-            SELECT Location, COUNT(*) as Listings
-            FROM food_listings
-            GROUP BY Location
-            ORDER BY Listings DESC
-        """)
-        st.bar_chart(df.set_index("Location"))
-
-        # 7. Most common food types
-        st.subheader("7️⃣ Most Common Food Types")
-        df = get_df("""
-            SELECT Food_Type, COUNT(*) as Count
-            FROM food_listings
-            GROUP BY Food_Type
-            ORDER BY Count DESC
-        """)
-        st.bar_chart(df.set_index("Food_Type"))
-
-        # 8. Claims per food item
-        st.subheader("8️⃣ Claims per Food Item")
-        df = get_df("""
-            SELECT f.Food_Name, COUNT(c.Claim_ID) as Claims
-            FROM food_listings f
-            LEFT JOIN claims c ON f.Food_ID = c.Food_ID
-            GROUP BY f.Food_Name
-            ORDER BY Claims DESC
-        """)
-        st.bar_chart(df.set_index("Food_Name"))
-
-        # 9. Provider with highest successful claims
-        st.subheader("9️⃣ Provider with Most Successful Claims")
-        df = get_df("""
-            SELECT p.Name, COUNT(c.Claim_ID) as Successful_Claims
-            FROM providers p
-            JOIN food_listings f ON p.Provider_ID = f.Provider_ID
-            JOIN claims c ON f.Food_ID = c.Food_ID
-            WHERE c.Status = 'Completed'
-            GROUP BY p.Name
-            ORDER BY Successful_Claims DESC
-        """)
-        st.bar_chart(df.set_index("Name"))
-
-        # 10. Percentage of claim statuses
-        st.subheader("🔟 Claim Status Distribution")
-        df = get_df("""
-            SELECT Status, COUNT(*) as Count
-            FROM claims
-            GROUP BY Status
-        """)
-        fig, ax = plt.subplots()
-        ax.pie(df["Count"], labels=df["Status"], autopct="%1.1f%%")
-        st.pyplot(fig)
-
-        # 11. Avg quantity claimed per receiver
-        st.subheader("1️⃣1️⃣ Average Quantity Claimed per Receiver")
-        df = get_df("""
-            SELECT r.Name, AVG(f.Quantity) as Avg_Claimed
-            FROM receivers r
-            JOIN claims c ON r.Receiver_ID = c.Receiver_ID
-            JOIN food_listings f ON c.Food_ID = f.Food_ID
-            GROUP BY r.Name
-        """)
-        st.bar_chart(df.set_index("Name"))
-
-        # 12. Most claimed meal type
-        st.subheader("1️⃣2️⃣ Most Claimed Meal Type")
-        df = get_df("""
-            SELECT f.Meal_Type, COUNT(c.Claim_ID) as Claims
-            FROM food_listings f
-            JOIN claims c ON f.Food_ID = c.Food_ID
-            GROUP BY f.Meal_Type
-            ORDER BY Claims DESC
-        """)
-        st.bar_chart(df.set_index("Meal_Type"))
-
-        # 13. Total quantity donated per provider
-        st.subheader("1️⃣3️⃣ Total Quantity Donated per Provider")
-        df = get_df("""
-            SELECT p.Name, SUM(f.Quantity) as Total_Quantity
-            FROM providers p
-            JOIN food_listings f ON p.Provider_ID = f.Provider_ID
-            GROUP BY p.Name
-            ORDER BY Total_Quantity DESC
-        """)
-        st.bar_chart(df.set_index("Name"))
+            if selected_insight in [
+                "2️⃣ Provider Type contributing most food",
+                "4️⃣ Top Receivers by Claims",
+                "6️⃣ City with Most Food Listings",
+                "7️⃣ Most Common Food Types",
+                "8️⃣ Claims per Food Item",
+                "9️⃣ Provider with Most Successful Claims",
+                "1️⃣1️⃣ Average Quantity Claimed per Receiver",
+                "1️⃣2️⃣ Most Claimed Meal Type",
+                "1️⃣3️⃣ Total Quantity Donated per Provider"
+            ]:
+                st.bar_chart(df.set_index(df.columns[0]))
+            elif selected_insight == "🔟 Claim Status Distribution":
+                fig, ax = plt.subplots()
+                ax.pie(df["Count"], labels=df["Status"], autopct="%1.1f%%")
+                st.pyplot(fig)
+            elif selected_insight == "5️⃣ Total Food Quantity Available":
+                st.metric("Total Quantity Available", df["Total_Quantity"].iloc[0])
+            elif selected_insight == "1️⃣ Providers & Receivers per City":
+                st.bar_chart(df.set_index("City"))
 
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# # main.py
+# import streamlit as st
+# import pandas as pd
+# import matplotlib.pyplot as plt
+# from db import get_db_connection, init_db
+
+# st.set_page_config(page_title="Food Wastage Management", layout="wide")
+
+# @st.cache_data
+# def get_df(sql, params=()):
+#     """Run SQL query and return DataFrame"""
+#     conn = get_db_connection()
+#     cur = conn.execute(sql, params)
+#     rows = cur.fetchall()
+#     cols = [desc[0] for desc in cur.description]
+#     conn.close()
+#     return pd.DataFrame(rows, columns=cols)
+
+
+# def main():
+#     st.title("🍽️ Food Wastage Management System")
+#     init_db()
+
+#     menu = ["Dashboard","Providers", "Receivers", "Food Listings", "Claims", "SQL Insights"]
+#     choice = st.sidebar.selectbox("📌 Menu", menu)
+
+#     # ---------------- Dashboard ----------------
+#     if choice == "Dashboard":
+#         st.header("📊 Dashboard Overview")
+
+#         total_providers = get_df("SELECT COUNT(*) as c FROM providers")["c"].iloc[0]
+#         total_receivers = get_df("SELECT COUNT(*) as c FROM receivers")["c"].iloc[0]
+#         total_food = get_df("SELECT COUNT(*) as c FROM food_listings")["c"].iloc[0]
+#         total_claims = get_df("SELECT COUNT(*) as c FROM claims")["c"].iloc[0]
+
+#         col1, col2, col3, col4 = st.columns(4)
+#         col1.metric("Providers", total_providers)
+#         col2.metric("Receivers", total_receivers)
+#         col3.metric("Food Listings", total_food)
+#         col4.metric("Claims", total_claims)
+    
+    
+    
+#     # ---------------- Providers ----------------
+#     elif choice == "Providers":
+#         st.header("🏢 Providers")
+#         df = get_df("SELECT * FROM providers")
+#         st.dataframe(df)
+
+#     # ---------------- Receivers ----------------
+#     elif choice == "Receivers":
+#         st.header("🤝 Receivers")
+#         df = get_df("SELECT * FROM receivers")
+#         st.dataframe(df)
+
+#     # ---------------- Food Listings ----------------
+#     elif choice == "Food Listings":
+#         st.header("🥗 Food Listings")
+#         df = get_df("SELECT * FROM food_listings")
+#         st.dataframe(df)
+
+#     # ---------------- Claims ----------------
+#     elif choice == "Claims":
+#         st.header("📦 Claims")
+#         df = get_df("SELECT * FROM claims")
+#         st.dataframe(df)
+
+#    # ---------------- SQL Insights ----------------
+#     elif choice == "SQL Insights":
+#         st.header("📈 SQL Insights & Analysis")
+
+#     insights = {
+#         "1️⃣ Providers & Receivers per City": """
+#             SELECT City, 
+#                    (SELECT COUNT(*) FROM providers p WHERE p.City = c.City) AS Providers,
+#                    (SELECT COUNT(*) FROM receivers r WHERE r.City = c.City) AS Receivers
+#             FROM (SELECT City FROM providers UNION SELECT City FROM receivers) c
+#         """,
+#         "2️⃣ Provider Type contributing most food": """
+#             SELECT Provider_Type, COUNT(*) as Total_Listings
+#             FROM food_listings
+#             GROUP BY Provider_Type
+#             ORDER BY Total_Listings DESC
+#         """,
+#         "3️⃣ Provider Contact Info by City": None,  # needs input
+#         "4️⃣ Top Receivers by Claims": """
+#             SELECT r.Name, COUNT(c.Claim_ID) as Total_Claims
+#             FROM receivers r
+#             JOIN claims c ON r.Receiver_ID = c.Receiver_ID
+#             GROUP BY r.Name
+#             ORDER BY Total_Claims DESC
+#         """,
+#         "5️⃣ Total Food Quantity Available": """
+#             SELECT SUM(Quantity) as Total_Quantity FROM food_listings
+#         """,
+#         "6️⃣ City with Most Food Listings": """
+#             SELECT Location, COUNT(*) as Listings
+#             FROM food_listings
+#             GROUP BY Location
+#             ORDER BY Listings DESC
+#         """,
+#         "7️⃣ Most Common Food Types": """
+#             SELECT Food_Type, COUNT(*) as Count
+#             FROM food_listings
+#             GROUP BY Food_Type
+#             ORDER BY Count DESC
+#         """,
+#         "8️⃣ Claims per Food Item": """
+#             SELECT f.Food_Name, COUNT(c.Claim_ID) as Claims
+#             FROM food_listings f
+#             LEFT JOIN claims c ON f.Food_ID = c.Food_ID
+#             GROUP BY f.Food_Name
+#             ORDER BY Claims DESC
+#         """,
+#         "9️⃣ Provider with Most Successful Claims": """
+#             SELECT p.Name, COUNT(c.Claim_ID) as Successful_Claims
+#             FROM providers p
+#             JOIN food_listings f ON p.Provider_ID = f.Provider_ID
+#             JOIN claims c ON f.Food_ID = c.Food_ID
+#             WHERE c.Status = 'Completed'
+#             GROUP BY p.Name
+#             ORDER BY Successful_Claims DESC
+#         """,
+#         "🔟 Claim Status Distribution": """
+#             SELECT Status, COUNT(*) as Count
+#             FROM claims
+#             GROUP BY Status
+#         """,
+#         "1️⃣1️⃣ Average Quantity Claimed per Receiver": """
+#             SELECT r.Name, AVG(f.Quantity) as Avg_Claimed
+#             FROM receivers r
+#             JOIN claims c ON r.Receiver_ID = c.Receiver_ID
+#             JOIN food_listings f ON c.Food_ID = f.Food_ID
+#             GROUP BY r.Name
+#         """,
+#         "1️⃣2️⃣ Most Claimed Meal Type": """
+#             SELECT f.Meal_Type, COUNT(c.Claim_ID) as Claims
+#             FROM food_listings f
+#             JOIN claims c ON f.Food_ID = c.Food_ID
+#             GROUP BY f.Meal_Type
+#             ORDER BY Claims DESC
+#         """,
+#         "1️⃣3️⃣ Total Quantity Donated per Provider": """
+#             SELECT p.Name, SUM(f.Quantity) as Total_Quantity
+#             FROM providers p
+#             JOIN food_listings f ON p.Provider_ID = f.Provider_ID
+#             GROUP BY p.Name
+#             ORDER BY Total_Quantity DESC
+#         """
+#     }
+
+#     selected_insight = st.selectbox("Select SQL Insight", list(insights.keys()))
+
+#     # Handle queries
+#     if selected_insight == "3️⃣ Provider Contact Info by City":
+#         city = st.selectbox("Select City", get_df("SELECT DISTINCT City FROM providers")["City"].tolist())
+#         df = get_df("SELECT Name, Contact FROM providers WHERE City = ?", (city,))
+#         st.dataframe(df)
+#     else:
+#         query = insights[selected_insight]
+#         df = get_df(query)
+
+#         # Show table
+#         st.dataframe(df)
+
+#         # Show plot depending on the data
+#         if selected_insight in [
+#             "2️⃣ Provider Type contributing most food",
+#             "4️⃣ Top Receivers by Claims",
+#             "6️⃣ City with Most Food Listings",
+#             "7️⃣ Most Common Food Types",
+#             "8️⃣ Claims per Food Item",
+#             "9️⃣ Provider with Most Successful Claims",
+#             "1️⃣1️⃣ Average Quantity Claimed per Receiver",
+#             "1️⃣2️⃣ Most Claimed Meal Type",
+#             "1️⃣3️⃣ Total Quantity Donated per Provider"
+#         ]:
+#             st.bar_chart(df.set_index(df.columns[0]))
+
+#         elif selected_insight == "🔟 Claim Status Distribution":
+#             fig, ax = plt.subplots()
+#             ax.pie(df["Count"], labels=df["Status"], autopct="%1.1f%%")
+#             st.pyplot(fig)
+
+#         elif selected_insight == "5️⃣ Total Food Quantity Available":
+#             st.metric("Total Quantity Available", df["Total_Quantity"].iloc[0])
+
+#         elif selected_insight == "1️⃣ Providers & Receivers per City":
+#             st.bar_chart(df.set_index("City"))
+
+
+# if __name__ == "__main__":
+#     main()
 
 
 
